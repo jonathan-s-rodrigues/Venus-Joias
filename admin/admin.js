@@ -1,20 +1,7 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCW99N-Ok683zmhwcTRSAeZ1o5fxLvSs44",
-  authDomain: "pedidos-venus-joias.firebaseapp.com",
-  projectId: "pedidos-venus-joias",
-  storageBucket: "pedidos-venus-joias.firebasestorage.app",
-  messagingSenderId: "504751234156",
-  appId: "1:504751234156:web:dcf8f4c9b416c5d0fa4c49",
-  measurementId: "G-K4RLW60R85"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+import { db, auth } from '../js/firebase.js';
 const pedidosRef = collection(db, "pedidos");
 const produtosRef = collection(db, "produtos");
 
@@ -197,9 +184,11 @@ function carregarPedidosCloud() {
         }
         container.innerHTML = pedidosCache.map(p => `
             <div class="pedido-salvo">
-                <div class="pedido-header"><span>Cliente: ${escapeHtml(p.cliente)}</span><span>${escapeHtml(p.data)}</span></div>
-                ${p.itens.map(i => `<div class="pedido-item"><span>${escapeHtml(i.nome)}</span><span>${i.qtd}x</span><span>R$ ${i.total.toFixed(2)}</span></div>`).join('')}
-                <div class="pedido-footer">Total Geral: R$ ${p.totalGeral.toFixed(2)}</div>
+                <div class="pedido-header"><span>Cliente: ${escapeHtml(p.cliente)}${p.telefone ? ' • ' + escapeHtml(p.telefone) : ''}${p.origem === 'site' ? ' <small>(site)</small>' : ''}</span><span>${escapeHtml(p.data)}</span></div>
+                ${p.itens.map(i => `<div class="pedido-item"><span>${escapeHtml(i.nome)}</span><span>${i.qtd}x</span><span>R$ ${Number(i.total).toFixed(2)}</span></div>`).join('')}
+                ${p.entrega ? `<div style="font-size:.8rem;padding:8px 0">🚚 ${escapeHtml(p.entrega.tipo)}${p.entrega.rua ? ' — ' + escapeHtml(p.entrega.rua + ', ' + p.entrega.numero + ' ' + (p.entrega.bairro || '') + ' ' + (p.entrega.cidade || '') + '/' + (p.entrega.uf || '')) : ''} &nbsp;|&nbsp; 💳 ${escapeHtml(p.pagamento || '-')}${p.obs ? ' &nbsp;|&nbsp; 📝 ' + escapeHtml(p.obs) : ''}</div>` : ''}
+                ${p.status ? `<div class="no-print" style="margin-top:8px"><select onchange="mudarStatus('${p.id}', this.value)" style="max-width:240px">${['novo','pago','enviado','entregue','cancelado'].map(x => `<option value="${x}" ${p.status === x ? 'selected' : ''}>Status: ${x}</option>`).join('')}</select></div>` : ''}
+                <div class="pedido-footer">Total Geral: R$ ${Number(p.totalGeral).toFixed(2)}</div>
                 <div class="acoes-pedido no-print">
                     <button class="btn-mini btn-whatsapp" onclick="enviarWhatsApp('${p.id}')">WhatsApp</button>
                     <button class="btn-mini" onclick="window.print()">Imprimir</button>
@@ -242,7 +231,7 @@ function atualizarListaProdutos() {
     container.innerHTML = produtos.map(produto => `
         <div class="produto-card">
             ${produto.foto ? `<img src="${escapeHtml(produto.foto)}" alt="${escapeHtml(produto.descricao)}" class="produto-foto">` : '<div class="produto-foto" style="display:flex;align-items:center;justify-content:center;color:#ccc;">Sem foto</div>'}
-            <div class="produto-descricao">${escapeHtml(produto.descricao)}</div>
+            <div class="produto-descricao">${produto.destaque ? '⭐ ' : ''}${escapeHtml(produto.descricao)}</div>
             <div class="produto-preco">
                 <div style="margin-bottom:5px;">Categoria: <strong>${escapeHtml(categoriaNome(produto.categoria))}</strong></div>
                 <div style="margin-bottom:5px;">Estoque: <strong>${parseInt(produto.estoque ?? 0, 10) || 0}</strong></div>
@@ -374,6 +363,7 @@ function limparEditorProduto() {
     document.getElementById('prodDescricao').value = '';
     document.getElementById('prodCusto').value = '';
     document.getElementById('prodEstoque').value = '0';
+    document.getElementById('prodDestaque').checked = false;
     document.getElementById('prodFoto').value = '';
     document.getElementById('imgPreview').removeAttribute('src');
     document.getElementById('imgPreview').style.display = 'none';
@@ -409,7 +399,7 @@ document.getElementById('btnSalvarProduto').addEventListener('click', async () =
     statusProduto('Salvando produto…');
     const editando = Boolean(produtoEmEdicao);
     try {
-        const dados = { descricao, custo, estoque, embalagem: 9, categoria: document.getElementById('prodCategoria').value || 'itens', precoSugerido, precoFinal, updatedAt: new Date() };
+        const dados = { descricao, custo, estoque, embalagem: 9, categoria: document.getElementById('prodCategoria').value || 'itens', precoSugerido, precoFinal, destaque: document.getElementById('prodDestaque').checked, updatedAt: new Date() };
         // An unchanged photo is omitted from the update so the saved photo stays intact.
         if (fotoEmEdicao !== null) dados.foto = fotoEmEdicao;
         if (editando) {
@@ -433,6 +423,19 @@ document.getElementById('btnCancelar').addEventListener('click', () => {
     limparEditorProduto();
     statusProduto('Edição cancelada.');
 });
+
+window.mudarStatus = async (id, status) => {
+    const p = pedidosCache.find(x => x.id === id);
+    await updateDoc(doc(db, 'pedidos', id), { status });
+    // Ao marcar como pago, baixa o estoque (uma única vez)
+    if (status === 'pago' && p && !p.estoqueBaixado && p.itens.every(i => i.produtoId)) {
+        for (const i of p.itens) {
+            const prod = produtosCache.find(x => x.id === i.produtoId);
+            if (prod) await updateDoc(doc(db, 'produtos', i.produtoId), { estoque: Math.max(0, (parseInt(prod.estoque, 10) || 0) - i.qtd) });
+        }
+        await updateDoc(doc(db, 'pedidos', id), { estoqueBaixado: true });
+    }
+};
 
 window.excluirPedido = async (id) => { if (confirm('Excluir da nuvem?')) await deleteDoc(doc(db, 'pedidos', id)); };
 
@@ -469,6 +472,7 @@ window.editarProduto = (id) => {
     if (pfEl) pfEl.value = (produto.precoFinal ?? '').toString();
     const estEl = document.getElementById('prodEstoque');
     if (estEl) estEl.value = String(parseInt(produto.estoque ?? 0, 10) || 0);
+    document.getElementById('prodDestaque').checked = !!produto.destaque;
     precoFinalEditadoManualmente = true;
     if (produto.foto) {
         document.getElementById('imgPreview').src = produto.foto;
@@ -514,3 +518,6 @@ document.getElementById('itemNome')?.addEventListener('input', () => {
     const valor = Number(produto.precoFinal ?? 0);
     if (valor > 0) document.getElementById('itemValor').value = valor.toFixed(2);
 });
+
+// PWA
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw-admin.js', { scope: '/admin/' }).catch(() => {});
