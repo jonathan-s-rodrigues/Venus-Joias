@@ -163,7 +163,7 @@ onAuthStateChanged(auth, (user) => {
         return;
     }
 
-    if (user) {
+    if (user && !user.isAnonymous) {
         overlay.style.display = 'none';
         btnSair.style.display = 'inline-block';
         carregarPedidosCloud();
@@ -196,6 +196,10 @@ function carregarPedidosCloud() {
                 </div>
             </div>
         `).join('');
+    }, (erro) => {
+        console.error('[admin] erro Firestore:', erro);
+        const msg = erro?.code === 'permission-denied' ? 'Sem permissão. Confira se as regras do Firestore foram publicadas e se você entrou com e-mail e senha.' : 'Erro ao carregar: ' + (erro?.message || erro);
+        document.getElementById('containerPedidos').innerHTML = '<p class="vazio">' + msg + '</p>';
     });
 }
 
@@ -207,6 +211,10 @@ function carregarProdutosCloud() {
         atualizarFiltroCategorias();
         atualizarListaProdutos();
         atualizarDatalistProdutos();
+    }, (erro) => {
+        console.error('[admin] erro Firestore:', erro);
+        const msg = erro?.code === 'permission-denied' ? 'Sem permissão. Confira se as regras do Firestore foram publicadas e se você entrou com e-mail e senha.' : 'Erro ao carregar: ' + (erro?.message || erro);
+        document.getElementById('listaProdutos').innerHTML = '<p class="vazio">' + msg + '</p>';
     });
 }
 

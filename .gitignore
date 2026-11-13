@@ -1,0 +1,37 @@
+# Dependências
+node_modules/
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+
+# Vercel / Firebase CLI
+.vercel/
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Arquivos gerados / temporários
+*.zip
+*.tmp
+.cache/

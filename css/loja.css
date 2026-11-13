@@ -497,3 +497,6 @@ body {
 .cart-content{display:flex;flex-direction:column}
 @media(max-width:900px){.slide{grid-template-columns:1fr;padding:24px 22px 46px;min-height:0}.slide h1{font-size:1.9rem}.slide img{max-height:220px;order:-1}.perks{grid-template-columns:1fr}.pdp-box{grid-template-columns:1fr;overflow:auto}.pdp-box img{min-height:220px;max-height:260px}.car-arrow{display:none}}
 @media(max-width:768px){.filters{display:block}.row-track .product-card{flex-basis:200px}}
+.mp-banner{max-width:1180px;margin:14px auto 0;padding:14px 18px;border-radius:var(--radius-md);font-weight:700;border:1px solid var(--border);background:var(--surface)}
+.mp-banner.ok{background:#e8f6ec;border-color:#9bd3ab}.mp-banner.warn{background:#fff6dd;border-color:#ebcf7a}.mp-banner.err{background:#fdeceb;border-color:#e8a5a0}
+.opt:has(input:disabled){cursor:not-allowed}

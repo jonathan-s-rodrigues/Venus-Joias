@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function admin() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'password'; }
+    // Catálogo: qualquer visitante lê; só o admin (e-mail/senha) escreve
+    match /produtos/{id} { allow read: if true; allow write: if admin(); }
+    // Pedidos: visitante só CRIA (com validação básica); só o admin lê/edita/exclui
+    match /pedidos/{id} {
+      allow create: if admin() || (
+        request.resource.data.origem == 'site'
+        && request.resource.data.itens.size() > 0 && request.resource.data.itens.size() <= 50
+        && request.resource.data.totalGeral is number && request.resource.data.status == 'novo');
+      allow read, update, delete: if admin();
+    }
+  }
+}

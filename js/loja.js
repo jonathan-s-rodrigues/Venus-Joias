@@ -1,6 +1,6 @@
 import { db, auth } from './firebase.js';
 import { collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-import { signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { CONFIG as C } from './config.js';
 
 const $ = id => document.getElementById(id);
@@ -134,6 +134,10 @@ function renderTotals() {
   $('sumSub').textContent = BRL.format(t.sub); $('sumDesc').textContent = '− ' + BRL.format(t.desc); $('rowDesc').hidden = !t.desc;
   $('sumFrete').textContent = t.freteTxt; $('sumTotal').textContent = BRL.format(t.total) + (t.ent === 'correios' ? ' + frete' : '');
   $('endBox').hidden = t.ent === 'retirada';
+  const online = t.ent !== 'correios';
+  document.querySelectorAll('input[name=pag][value=pix],input[name=pag][value=cartao]').forEach(r => { r.disabled = !online; r.closest('.opt').style.opacity = online ? 1 : .45; });
+  if (!online && t.pag !== 'combinar') { document.querySelector('input[name=pag][value=combinar]').checked = true; return renderTotals(); }
+  $('btnPedido').textContent = ['pix', 'cartao'].includes(t.pag) ? 'Pagar agora' : 'Enviar pedido';
 }
 $('viewCheckout').addEventListener('change', renderTotals);
 
@@ -175,7 +179,20 @@ $('viewCheckout').addEventListener('submit', async ev => {
     subtotal: t.sub, desconto: t.desc, frete: t.frete, totalGeral: t.total, createdAt: new Date()
   };
   const btn = $('btnPedido'); btn.disabled = true; btn.textContent = 'Enviando…';
-  let salvo = true; try { await addDoc(collection(db, 'pedidos'), order); } catch (e) { salvo = false; console.error(e); }
+  let salvo = true, ref = null; try { ref = await addDoc(collection(db, 'pedidos'), order); } catch (e) { salvo = false; console.error(e); }
+  // Pix / cartão: segue para o pagamento seguro do Mercado Pago
+  if (ref && ['pix', 'cartao'].includes(t.pag) && t.ent !== 'correios') {
+    btn.textContent = 'Abrindo pagamento…';
+    try {
+      const r = await fetch('/api/criar-pagamento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: ref.id }) });
+      const j = await r.json();
+      if (r.ok && j.url) { cart.clear(); save(); location.href = j.url; return; }
+      erro(j.erro || 'Não foi possível abrir o pagamento.');
+    } catch (e) { console.error(e); erro('Não foi possível abrir o pagamento.'); }
+    btn.disabled = false; btn.textContent = 'Pagar agora';
+    $('coErro').textContent += ' Tente novamente ou escolha "Combinar com a loja".';
+    return;
+  }
   btn.disabled = false; btn.textContent = 'Enviar pedido';
   lastOrder = order; cart.clear(); save(); renderCart();
   $('okMsg').textContent = salvo ? 'Seu pedido foi registrado. Agora é só enviá-lo pelo WhatsApp para confirmarmos tudo.' : 'Não conseguimos registrar online, mas você pode enviar o pedido pelo WhatsApp abaixo.';
@@ -215,12 +232,13 @@ $('perkParc').textContent = C.PARCELAS_MAX;
 $('perkFrete').textContent = C.FRETE_GRATIS_ACIMA ? `Frete grátis acima de ${BRL.format(C.FRETE_GRATIS_ACIMA)}` : 'Consulte o frete';
 $('optEntrega').textContent = `${BRL.format(C.FRETE_ENTREGA)}${C.FRETE_GRATIS_ACIMA ? ` (grátis acima de ${BRL.format(C.FRETE_GRATIS_ACIMA)})` : ''}`;
 $('optRetirada').textContent = 'Grátis • ' + C.RETIRADA_ENDERECO;
-$('optPix').textContent = C.DESCONTO_PIX ? `${Math.round(C.DESCONTO_PIX * 100)}% de desconto` : 'Pagamento instantâneo';
-$('optCartao').textContent = `Até ${C.PARCELAS_MAX}x • enviamos o link de pagamento pelo WhatsApp`;
+$('optPix').textContent = (C.DESCONTO_PIX ? `${Math.round(C.DESCONTO_PIX * 100)}% de desconto • ` : '') + 'QR Code ou copia-e-cola, aprovação na hora';
+$('optCartao').textContent = `Até ${C.PARCELAS_MAX}x no cartão • ambiente seguro do Mercado Pago`;
 
 /* ---------- Dados ---------- */
 async function load() {
-  try { await signInAnonymously(auth); } catch { }
+  // não derruba a sessão do admin se ele estiver logado no mesmo navegador
+  try { const u = await new Promise(r => { const off = onAuthStateChanged(auth, x => { off(); r(x); }); }); if (!u) await signInAnonymously(auth); } catch { }
   try {
     const snap = await getDocs(collection(db, 'produtos'));
     PRODUCTS = snap.docs.map(d => { const x = d.data() || {}; const preco = Number(x.precoFinal ?? 0);
@@ -234,6 +252,14 @@ async function load() {
   }
 }
 renderCart(); load();
+
+/* ---------- Retorno do Mercado Pago ---------- */
+(() => {
+  const q = new URLSearchParams(location.search), s = q.get('mp'); if (!s) return;
+  const m = { ok: ['✅ Pagamento aprovado! Obrigada pela compra — já vamos separar seu pedido.', 'ok'], pendente: ['⏳ Pagamento pendente. Assim que for confirmado, avisamos você pelo WhatsApp.', 'warn'], falhou: ['❌ O pagamento não foi concluído. Você pode tentar novamente pela sacola.', 'err'] }[s];
+  if (m) { const b = $('mpBanner'); b.textContent = m[0]; b.className = 'mp-banner ' + m[1]; b.hidden = false; }
+  history.replaceState(null, '', location.pathname);
+})();
 
 /* ---------- PWA ---------- */
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { });
