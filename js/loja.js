@@ -188,7 +188,7 @@ $('viewCheckout').addEventListener('submit', async ev => {
       const j = await r.json().catch(() => ({ erro: `Servidor de pagamento indisponível (código ${r.status}). Confira se o site foi publicado na Vercel com a pasta api/.` }));
       if (!r.ok) console.error('[pagamento]', r.status, j);
       if (r.ok && j.url) { cart.clear(); save(); location.href = j.url; return; }
-      erro(j.erro || 'Não foi possível abrir o pagamento.');
+      erro((j.erro || 'Não foi possível abrir o pagamento.') + (j.detalhe ? ` [${j.detalhe}]` : ''));
     } catch (e) { console.error(e); erro('Não foi possível abrir o pagamento.'); }
     btn.disabled = false; btn.textContent = 'Pagar agora';
     $('coErro').textContent += ' Tente novamente ou escolha "Combinar com a loja".';

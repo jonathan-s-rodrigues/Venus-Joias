@@ -39,8 +39,8 @@ export default async function handler(req, res) {
     const site = siteUrl(req), https = site.startsWith('https://');
     const back = s => `${site}/?mp=${s}&pedido=${orderId}`;
     const excluidos = o.pagamento === 'pix'
-      ? ['credit_card', 'debit_card', 'ticket', 'account_money', 'prepaid_card']       // só Pix
-      : ['ticket', 'bank_transfer', 'account_money', 'prepaid_card'];                  // só cartão
+      ? ['credit_card', 'debit_card', 'ticket', 'prepaid_card']       // só Pix (saldo MP não pode ser excluído)
+      : ['ticket', 'bank_transfer', 'prepaid_card'];                  // só cartão
     const qtdTotal = itens.reduce((s, i) => s + i.qtd, 0);
     const pref = await mp('/checkout/preferences', {
       method: 'POST',
