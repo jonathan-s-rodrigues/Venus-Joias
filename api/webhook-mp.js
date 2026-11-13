@@ -1,6 +1,7 @@
-import { db, mp } from './_lib.js';
+import { db, initError, mp } from './_lib.js';
 
 export default async function handler(req, res) {
+  if (initError || !process.env.MP_ACCESS_TOKEN) return res.status(500).end();
   try {
     const type = req.query.type || req.body?.type || req.query.topic;
     const id = req.query['data.id'] || req.body?.data?.id || (req.query.topic === 'payment' ? req.query.id : null);

@@ -185,7 +185,8 @@ $('viewCheckout').addEventListener('submit', async ev => {
     btn.textContent = 'Abrindo pagamento…';
     try {
       const r = await fetch('/api/criar-pagamento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: ref.id }) });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({ erro: `Servidor de pagamento indisponível (código ${r.status}). Confira se o site foi publicado na Vercel com a pasta api/.` }));
+      if (!r.ok) console.error('[pagamento]', r.status, j);
       if (r.ok && j.url) { cart.clear(); save(); location.href = j.url; return; }
       erro(j.erro || 'Não foi possível abrir o pagamento.');
     } catch (e) { console.error(e); erro('Não foi possível abrir o pagamento.'); }

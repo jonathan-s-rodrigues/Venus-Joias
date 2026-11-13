@@ -1,9 +1,11 @@
-import { db, mp, CFG, r2, siteUrl } from './_lib.js';
+import { db, initError, mp, CFG, r2, siteUrl } from './_lib.js';
 
-const erro = (res, s, m) => res.status(s).json({ erro: m });
+const erro = (res, s, m, detalhe) => res.status(s).json({ erro: m, detalhe });
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return erro(res, 405, 'Método não permitido');
+  if (initError) return erro(res, 500, 'Configuração do servidor incompleta', initError);
+  if (!process.env.MP_ACCESS_TOKEN) return erro(res, 500, 'Configuração do servidor incompleta', 'MP_ACCESS_TOKEN ausente');
   try {
     const orderId = req.body?.orderId;
     if (typeof orderId !== 'string' || !orderId) return erro(res, 400, 'Pedido inválido');
@@ -57,6 +59,6 @@ export default async function handler(req, res) {
     return res.json({ url: pref.init_point });
   } catch (e) {
     console.error('[criar-pagamento]', e);
-    return erro(res, 500, 'Não foi possível iniciar o pagamento');
+    return erro(res, 500, 'Não foi possível iniciar o pagamento', String(e.message).slice(0, 300));
   }
 }

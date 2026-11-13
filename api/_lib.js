@@ -1,8 +1,17 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-if (!getApps().length) initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
-export const db = getFirestore();
+export let initError = null;
+let _db = null;
+try {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) throw new Error('FIREBASE_SERVICE_ACCOUNT ausente');
+  if (!getApps().length) initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
+  _db = getFirestore();
+} catch (e) {
+  initError = process.env.FIREBASE_SERVICE_ACCOUNT ? 'FIREBASE_SERVICE_ACCOUNT inválida (cole o JSON inteiro, sem aspas extras)' : 'FIREBASE_SERVICE_ACCOUNT ausente';
+  console.error('[init]', e.message);
+}
+export const db = _db;
 
 const n = (v, d) => (v === undefined || v === '' || isNaN(Number(v)) ? d : Number(v));
 export const CFG = {
