@@ -1,4 +1,4 @@
-import { db, initError, mp, CFG, r2, siteUrl } from './_lib.js';
+import { db, initError, mp, CFG, r2, siteUrl, cotarFrete } from './_lib.js';
 
 const erro = (res, s, m, detalhe) => res.status(s).json({ erro: m, detalhe });
 
@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     const ref = db.collection('pedidos').doc(orderId), snap = await ref.get();
     if (!snap.exists) return erro(res, 404, 'Pedido não encontrado');
     const o = snap.data();
-    if (o.origem !== 'site' || !['pix', 'cartao'].includes(o.pagamento) || o.entrega?.tipo === 'correios') return erro(res, 400, 'Pedido não é elegível para pagamento online');
+    if (o.origem !== 'site' || !['pix', 'cartao'].includes(o.pagamento)) return erro(res, 400, 'Pedido não é elegível para pagamento online');
     if (o.status === 'pago') return erro(res, 409, 'Pedido já pago');
     if (o.mpInitPoint) return res.json({ url: o.mpInitPoint });
 
@@ -32,7 +32,14 @@ export default async function handler(req, res) {
     }
     sub = r2(sub);
     const desconto = o.pagamento === 'pix' ? r2(sub * CFG.DESCONTO_PIX) : 0;
-    const frete = o.entrega?.tipo === 'entrega' ? (CFG.FRETE_GRATIS_ACIMA && sub >= CFG.FRETE_GRATIS_ACIMA ? 0 : CFG.FRETE_ENTREGA) : 0;
+    let frete = 0, servico = null;
+    if (o.entrega?.tipo === 'frete') {
+      const cep = String(o.entrega.cep || '').replace(/\D/g, '');
+      if (cep.length !== 8 || !o.entrega.servicoId) return erro(res, 400, 'Informe o CEP e escolha o frete');
+      servico = (await cotarFrete({ cep, itens, sub })).find(x => x.id === String(o.entrega.servicoId));   // frete recalculado no servidor
+      if (!servico) return erro(res, 409, 'Frete indisponível. Escolha novamente.');
+      frete = servico.preco;
+    }
     const total = r2(sub - desconto + frete);
     if (!(total > 0)) return erro(res, 400, 'Total inválido');
 
@@ -55,7 +62,7 @@ export default async function handler(req, res) {
       }),
     });
 
-    await ref.update({ itens, subtotal: sub, desconto, frete, totalGeral: total, mpPreferenceId: pref.id, mpInitPoint: pref.init_point, mpStatus: 'aguardando' });
+    await ref.update({ ...(servico ? { entrega: { ...o.entrega, servicoNome: servico.nome, prazo: servico.prazo ?? null } } : {}), itens, subtotal: sub, desconto, frete, totalGeral: total, mpPreferenceId: pref.id, mpInitPoint: pref.init_point, mpStatus: 'aguardando' });
     return res.json({ url: pref.init_point });
   } catch (e) {
     console.error('[criar-pagamento]', e);

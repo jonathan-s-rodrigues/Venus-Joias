@@ -98,19 +98,18 @@
       <input id="coFone" placeholder="WhatsApp com DDD" inputmode="tel" required autocomplete="tel">
       <h4>2. Entrega</h4>
       <label class="opt"><input type="radio" name="entrega" value="retirada" checked><span><strong>Retirada</strong><small id="optRetirada">Grátis</small></span></label>
-      <label class="opt"><input type="radio" name="entrega" value="entrega"><span><strong>Entrega local</strong><small id="optEntrega"></small></span></label>
-      <label class="opt"><input type="radio" name="entrega" value="correios"><span><strong>Correios / transportadora</strong><small>Frete calculado e confirmado no WhatsApp</small></span></label>
+      <label class="opt"><input type="radio" name="entrega" value="frete"><span><strong>Frete (envio para o seu endereço)</strong><small id="optFrete"></small></span></label>
       <div id="endBox" hidden>
         <input id="coCep" placeholder="CEP" inputmode="numeric" maxlength="9" autocomplete="postal-code">
         <input id="coRua" placeholder="Rua" autocomplete="address-line1">
         <div class="two"><input id="coNum" placeholder="Número"><input id="coComp" placeholder="Complemento"></div>
         <input id="coBairro" placeholder="Bairro">
         <div class="two"><input id="coCidade" placeholder="Cidade"><input id="coUf" placeholder="UF" maxlength="2"></div>
+        <div id="freteOpcoes" class="fretes"></div>
       </div>
       <h4>3. Pagamento</h4>
       <label class="opt"><input type="radio" name="pag" value="pix" checked><span><strong>Pix</strong><small id="optPix"></small></span></label>
       <label class="opt"><input type="radio" name="pag" value="cartao"><span><strong>Cartão de crédito</strong><small id="optCartao"></small></span></label>
-      <label class="opt"><input type="radio" name="pag" value="combinar"><span><strong>Combinar com a loja</strong><small>Dinheiro, transferência ou outro</small></span></label>
       <textarea id="coObs" placeholder="Observações (opcional)" rows="2"></textarea>
     </div>
     <div class="cart-footer">
@@ -119,7 +118,7 @@
       <div class="sum"><span>Frete</span><span id="sumFrete"></span></div>
       <div class="total"><span>Total</span><span id="sumTotal"></span></div>
       <p id="coErro" class="erro" role="alert"></p>
-      <button class="btn-checkout dark" id="btnPedido" type="submit">Enviar pedido</button>
+      <button class="btn-checkout dark" id="btnPedido" type="submit">Pagar agora</button>
       <button class="link-btn" type="button" id="backCart">← Voltar à sacola</button>
     </div>
   </form>

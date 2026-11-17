@@ -500,3 +500,5 @@ body {
 .mp-banner{max-width:1180px;margin:14px auto 0;padding:14px 18px;border-radius:var(--radius-md);font-weight:700;border:1px solid var(--border);background:var(--surface)}
 .mp-banner.ok{background:#e8f6ec;border-color:#9bd3ab}.mp-banner.warn{background:#fff6dd;border-color:#ebcf7a}.mp-banner.err{background:#fdeceb;border-color:#e8a5a0}
 .opt:has(input:disabled){cursor:not-allowed}
+
+.fretes{display:grid;gap:10px}

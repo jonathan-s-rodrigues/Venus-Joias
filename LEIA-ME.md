@@ -17,5 +17,10 @@ Fluxo: cliente escolhe Pix ou cartão → pedido é salvo → site abre o Checko
 2. **Conta de serviço**: Firebase → ⚙️ Configurações do projeto → *Contas de serviço* → *Gerar nova chave privada*. Cole o JSON inteiro (uma linha) na variável `FIREBASE_SERVICE_ACCOUNT`.
 3. **Vercel → Settings → Environment Variables**: crie `MP_ACCESS_TOKEN`, `FIREBASE_SERVICE_ACCOUNT` e (opcional) `SITE_URL`. Veja `.env.example`. Refaça o deploy depois.
 4. **Webhook**: Mercado Pago → sua aplicação → *Webhooks* → URL `https://SEU-SITE/api/webhook-mp` → evento **Pagamentos**.
-5. `DESCONTO_PIX`, `FRETE_ENTREGA`, `FRETE_GRATIS_ACIMA` e `PARCELAS_MAX` existem em `js/config.js` (exibição) e nas variáveis da Vercel (cálculo real). **Mantenha os dois iguais**; o servidor sempre recalcula os valores.
-- Correios: sem pagamento online (frete a confirmar) → "Combinar com a loja".
+5. `DESCONTO_PIX`, `FRETE_ENVIO`, `FRETE_GRATIS_ACIMA` e `PARCELAS_MAX` existem em `js/config.js` (exibição) e nas variáveis da Vercel (cálculo real). **Mantenha os dois iguais**; o servidor sempre recalcula os valores.
+- Entrega: **Retirada** (grátis) ou **Frete** (valor fixo `FRETE_ENVIO`, grátis acima de `FRETE_GRATIS_ACIMA`). Pagamento só online (Pix ou cartão).
+
+## Frete real (Melhor Envio)
+1. Melhor Envio → *Integrações → Área do desenvolvedor* → crie um app e gere um **token** (sandbox em sandbox.melhorenvio.com.br; produção em melhorenvio.com.br). Marque o escopo de **cálculo de fretes** (shipping-calculate).
+2. Vercel: crie `MELHORENVIO_TOKEN`, `MELHORENVIO_ENV` (`sandbox` ou `producao`), `CEP_ORIGEM`, `CONTATO_EMAIL` e, se quiser, `PACOTE_*` (padrão 16×11×2 cm, 100 g). Faça novo deploy e confira em `/api/status`.
+3. A cliente digita o CEP → vê PAC/SEDEX com preço e prazo. O servidor recalcula o frete na hora do pagamento. Frete grátis acima do valor configurado vale para a opção mais barata.

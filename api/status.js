@@ -6,6 +6,7 @@ export default async function handler(req, res) {
     MP_ACCESS_TOKEN: !!process.env.MP_ACCESS_TOKEN,
     MP_TOKEN_TIPO: (process.env.MP_ACCESS_TOKEN || '').startsWith('TEST-') ? 'teste' : (process.env.MP_ACCESS_TOKEN ? 'produção' : null),
     FIREBASE_SERVICE_ACCOUNT: !process.env.FIREBASE_SERVICE_ACCOUNT ? 'ausente' : (initError ? 'inválida' : 'ok'),
+    MELHOR_ENVIO: process.env.MELHORENVIO_TOKEN ? `ok (${process.env.MELHORENVIO_ENV === 'sandbox' ? 'sandbox' : 'produção'}, CEP origem ${process.env.CEP_ORIGEM ? 'definido' : 'AUSENTE'})` : 'sem token (usando frete fixo)',
     SITE_URL: process.env.SITE_URL || '(não definida: usando o domínio da requisição)',
   };
   try { if (db) { await db.collection('produtos').limit(1).get(); out.FIRESTORE = 'ok'; } else out.FIRESTORE = 'sem conexão'; }

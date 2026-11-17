@@ -12,6 +12,7 @@ const normCat = c => String(c || 'itens').trim().toLowerCase().normalize('NFD').
 
 let PRODUCTS = [], cat = 'todos', termo = '', ordem = 'rel', pdpId = null, pdpQtd = 1, lastOrder = null;
 let cart = new Map(Object.entries(JSON.parse(localStorage.getItem('venus_cart') || '{}')));
+let freteSel = null, freteOpts = [];
 const save = () => localStorage.setItem('venus_cart', JSON.stringify(Object.fromEntries(cart)));
 
 function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 1800); }
@@ -125,38 +126,48 @@ function totals() {
   const sub = subtotal(), ent = radio('entrega'), pag = radio('pag');
   const desc = pag === 'pix' ? Math.round(sub * C.DESCONTO_PIX * 100) / 100 : 0;
   let frete = 0, freteTxt = 'Grátis';
-  if (ent === 'entrega') { frete = C.FRETE_GRATIS_ACIMA && sub >= C.FRETE_GRATIS_ACIMA ? 0 : C.FRETE_ENTREGA; freteTxt = frete ? BRL.format(frete) : 'Grátis'; }
-  if (ent === 'correios') freteTxt = 'A confirmar';
+  if (ent === 'frete') { frete = freteSel ? freteSel.preco : 0; freteTxt = !freteSel ? 'Informe o CEP' : frete ? BRL.format(frete) : 'Grátis'; }
   return { sub, desc, frete, freteTxt, total: Math.round((sub - desc + frete) * 100) / 100, ent, pag };
 }
 function renderTotals() {
   const t = totals();
   $('sumSub').textContent = BRL.format(t.sub); $('sumDesc').textContent = '− ' + BRL.format(t.desc); $('rowDesc').hidden = !t.desc;
-  $('sumFrete').textContent = t.freteTxt; $('sumTotal').textContent = BRL.format(t.total) + (t.ent === 'correios' ? ' + frete' : '');
+  $('sumFrete').textContent = t.freteTxt; $('sumTotal').textContent = BRL.format(t.total);
   $('endBox').hidden = t.ent === 'retirada';
-  const online = t.ent !== 'correios';
-  document.querySelectorAll('input[name=pag][value=pix],input[name=pag][value=cartao]').forEach(r => { r.disabled = !online; r.closest('.opt').style.opacity = online ? 1 : .45; });
-  if (!online && t.pag !== 'combinar') { document.querySelector('input[name=pag][value=combinar]').checked = true; return renderTotals(); }
-  $('btnPedido').textContent = ['pix', 'cartao'].includes(t.pag) ? 'Pagar agora' : 'Enviar pedido';
+  $('btnPedido').textContent = 'Pagar agora';
 }
-$('viewCheckout').addEventListener('change', renderTotals);
+$('viewCheckout').addEventListener('change', e => { if (e.target.name === 'servico') freteSel = freteOpts.find(o => o.id === e.target.value) || freteSel; renderTotals(); });
 
 $('coCep').addEventListener('input', async e => {
   let v = e.target.value.replace(/\D/g, '').slice(0, 8); e.target.value = v.length > 5 ? v.slice(0, 5) + '-' + v.slice(5) : v;
-  if (v.length !== 8) return;
+  if (v.length !== 8) { freteSel = null; freteOpts = []; $('freteOpcoes').innerHTML = ''; renderTotals(); return; }
   try { const r = await (await fetch(`https://viacep.com.br/ws/${v}/json/`)).json(); if (r.erro) return;
     $('coRua').value = r.logradouro || ''; $('coBairro').value = r.bairro || ''; $('coCidade').value = r.localidade || ''; $('coUf').value = r.uf || ''; $('coNum').focus(); } catch { }
+  cotarFrete();
 });
+
+async function cotarFrete() {
+  const cep = $('coCep').value.replace(/\D/g, ''); if (cep.length !== 8) return;
+  const box = $('freteOpcoes'); box.innerHTML = '<small class="muted">Calculando frete…</small>'; freteSel = null; renderTotals();
+  try {
+    const r = await fetch('/api/frete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cep, itens: items().map(i => ({ produtoId: i.id, qtd: i.qtd })) }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.opcoes) throw new Error(j.erro || 'Não foi possível calcular o frete agora.');
+    freteOpts = j.opcoes; freteSel = freteOpts[0];
+    box.innerHTML = freteOpts.map((o, i) => `<label class="opt"><input type="radio" name="servico" value="${esc(o.id)}" ${i === 0 ? 'checked' : ''}><span><strong>${esc(o.nome)}</strong><small>${o.preco ? BRL.format(o.preco) : 'Grátis'}${o.prazo ? ` • até ${o.prazo} dias úteis` : ''}</small></span></label>`).join('');
+  } catch (e) { freteOpts = []; box.innerHTML = `<small class="erro">${esc(e.message)}</small>`; }
+  renderTotals();
+}
 
 function summaryText(o) {
   const L = ['*Vênus Joias — Novo pedido*', '', `*Cliente:* ${o.cliente}`, `*WhatsApp:* ${o.telefone}`, ''];
   o.itens.forEach(i => L.push(`• ${i.qtd}x ${i.nome} — ${BRL.format(i.total)}`));
   L.push('', `Subtotal: ${BRL.format(o.subtotal)}`);
   if (o.desconto) L.push(`Desconto Pix: − ${BRL.format(o.desconto)}`);
-  L.push(`Frete: ${o.entrega.tipo === 'correios' ? 'a confirmar' : BRL.format(o.frete)}`, `*Total:* ${BRL.format(o.totalGeral)}`, '');
+  L.push(`Frete: ${BRL.format(o.frete)}`, `*Total:* ${BRL.format(o.totalGeral)}`, '');
   const e = o.entrega;
-  L.push(e.tipo === 'retirada' ? '*Entrega:* Retirada' : `*Entrega:* ${e.tipo === 'correios' ? 'Correios' : 'Entrega local'} — ${e.rua}, ${e.numero}${e.complemento ? ' ' + e.complemento : ''} — ${e.bairro}, ${e.cidade}/${e.uf} — CEP ${e.cep}`);
-  L.push(`*Pagamento:* ${{ pix: 'Pix', cartao: 'Cartão de crédito', combinar: 'A combinar' }[o.pagamento]}`);
+  L.push(e.tipo === 'retirada' ? '*Entrega:* Retirada' : `*Envio:* ${e.rua}, ${e.numero}${e.complemento ? ' ' + e.complemento : ''} — ${e.bairro}, ${e.cidade}/${e.uf} — CEP ${e.cep}`);
+  L.push(`*Pagamento:* ${{ pix: 'Pix', cartao: 'Cartão de crédito' }[o.pagamento]}`);
   if (o.obs) L.push(`*Obs:* ${o.obs}`);
   return L.join('\n');
 }
@@ -172,6 +183,7 @@ $('viewCheckout').addEventListener('submit', async ev => {
     end = { tipo: t.ent, cep: $('coCep').value, rua: $('coRua').value.trim(), numero: $('coNum').value.trim(), complemento: $('coComp').value.trim(), bairro: $('coBairro').value.trim(), cidade: $('coCidade').value.trim(), uf: $('coUf').value.trim().toUpperCase() };
     if (!end.rua || !end.numero || !end.cidade || end.cep.replace(/\D/g, '').length !== 8) return erro('Preencha CEP, rua, número e cidade para a entrega.');
   }
+  if (t.ent === 'frete') { if (!freteSel) return erro('Informe o CEP e escolha o frete.'); end.servicoId = freteSel.id; end.servicoNome = freteSel.nome; end.prazo = freteSel.prazo ?? null; }
   const d = new Date(), data = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const order = {
     cliente: nome, telefone: $('coFone').value.trim(), data, origem: 'site', status: 'novo', pagamento: t.pag, entrega: end, obs: $('coObs').value.trim(),
@@ -181,7 +193,7 @@ $('viewCheckout').addEventListener('submit', async ev => {
   const btn = $('btnPedido'); btn.disabled = true; btn.textContent = 'Enviando…';
   let salvo = true, ref = null; try { ref = await addDoc(collection(db, 'pedidos'), order); } catch (e) { salvo = false; console.error(e); }
   // Pix / cartão: segue para o pagamento seguro do Mercado Pago
-  if (ref && ['pix', 'cartao'].includes(t.pag) && t.ent !== 'correios') {
+  if (ref && ['pix', 'cartao'].includes(t.pag)) {
     btn.textContent = 'Abrindo pagamento…';
     try {
       const r = await fetch('/api/criar-pagamento', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: ref.id }) });
@@ -191,7 +203,7 @@ $('viewCheckout').addEventListener('submit', async ev => {
       erro((j.erro || 'Não foi possível abrir o pagamento.') + (j.detalhe ? ` [${j.detalhe}]` : ''));
     } catch (e) { console.error(e); erro('Não foi possível abrir o pagamento.'); }
     btn.disabled = false; btn.textContent = 'Pagar agora';
-    $('coErro').textContent += ' Tente novamente ou escolha "Combinar com a loja".';
+    $('coErro').textContent += ' Tente novamente em instantes.';
     return;
   }
   btn.disabled = false; btn.textContent = 'Enviar pedido';
@@ -202,7 +214,7 @@ $('viewCheckout').addEventListener('submit', async ev => {
   view('ok');
 });
 $('copyPix').onclick = () => navigator.clipboard?.writeText(C.PIX_CHAVE).then(() => toast('Chave Pix copiada'));
-$('goCheckout').onclick = () => { if (items().length) { view('checkout'); renderTotals(); } };
+$('goCheckout').onclick = () => { if (items().length) { view('checkout'); renderTotals(); cotarFrete(); } };
 $('backCart').onclick = () => view('cart');
 $('okFechar').onclick = () => { closeCart(); view('cart'); };
 
@@ -231,7 +243,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCart(
 $('perkPix').textContent = C.DESCONTO_PIX ? `${Math.round(C.DESCONTO_PIX * 100)}% de desconto no pagamento` : 'Pagamento instantâneo';
 $('perkParc').textContent = C.PARCELAS_MAX;
 $('perkFrete').textContent = C.FRETE_GRATIS_ACIMA ? `Frete grátis acima de ${BRL.format(C.FRETE_GRATIS_ACIMA)}` : 'Consulte o frete';
-$('optEntrega').textContent = `${BRL.format(C.FRETE_ENTREGA)}${C.FRETE_GRATIS_ACIMA ? ` (grátis acima de ${BRL.format(C.FRETE_GRATIS_ACIMA)})` : ''}`;
+$('optFrete').textContent = 'Correios (PAC/SEDEX) calculado pelo CEP' + (C.FRETE_GRATIS_ACIMA ? ` • grátis acima de ${BRL.format(C.FRETE_GRATIS_ACIMA)}` : '');
 $('optRetirada').textContent = 'Grátis • ' + C.RETIRADA_ENDERECO;
 $('optPix').textContent = (C.DESCONTO_PIX ? `${Math.round(C.DESCONTO_PIX * 100)}% de desconto • ` : '') + 'QR Code ou copia-e-cola, aprovação na hora';
 $('optCartao').textContent = `Até ${C.PARCELAS_MAX}x no cartão • ambiente seguro do Mercado Pago`;
