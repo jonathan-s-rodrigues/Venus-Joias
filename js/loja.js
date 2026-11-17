@@ -275,6 +275,6 @@ renderCart(); load();
 })();
 
 /* ---------- PWA ---------- */
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => { });
 let deferred; window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; $('install-btn').hidden = false; });
 $('install-btn').onclick = async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; $('install-btn').hidden = true; };
